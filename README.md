@@ -1,4 +1,4 @@
-# Python Sentinel — Black/Gray Edition
+# Python Sentinel — Cybersecurity Monitoring & Phishing Detection
 
 This project supports both **local Windows demo/testing** and an **online public Django demo**.
 
