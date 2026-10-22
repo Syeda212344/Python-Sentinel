@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 274" role="img" aria-label="Three dimensional PS cybersecurity shield">
+<defs>
+  <linearGradient id="edge" x1=".08" y1=".08" x2=".94" y2=".86"><stop stop-color="#e1faff"/><stop offset=".22" stop-color="#5dc8ff"/><stop offset=".50" stop-color="#1c65cd"/><stop offset=".76" stop-color="#78d4ff"/><stop offset="1" stop-color="#062654"/></linearGradient>
+  <linearGradient id="inside" x1=".2" y1=".08" x2=".85" y2="1"><stop stop-color="#194987"/><stop offset=".48" stop-color="#071934"/><stop offset="1" stop-color="#020a19"/></linearGradient>
+  <linearGradient id="letters" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffffff"/><stop offset=".4" stop-color="#a6e7ff"/><stop offset=".72" stop-color="#4da9fa"/><stop offset="1" stop-color="#0d65e5"/></linearGradient>
+  <filter id="glow" x="-55%" y="-55%" width="210%" height="210%"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  <filter id="depth" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="4" dy="9" stdDeviation="8" flood-color="#041129" flood-opacity=".95"/></filter>
+</defs>
+<g filter="url(#depth)">
+ <path d="M120 9C86 34 55 33 21 40L15 132Q18 206 120 260Q222 206 225 132L219 40C185 33 154 34 120 9Z" fill="#031127" stroke="#071e3e" stroke-width="7"/>
+ <path d="M120 13C86 38 55 37 25 44L19 132Q22 203 120 255Q218 203 221 132L215 44C185 37 154 38 120 13Z" fill="none" stroke="url(#edge)" stroke-width="7" filter="url(#glow)"/>
+ <path d="M120 24C88 47 61 47 34 52L29 130Q34 192 120 242Q206 192 211 130L206 52C179 47 152 47 120 24Z" fill="url(#inside)" stroke="#276ac4" stroke-width="1.5"/>
+ <path d="M120 30C91 52 62 53 40 58L36 125Q41 184 120 230" fill="none" stroke="#8bddff" stroke-opacity=".34" stroke-width="2"/>
+ <g stroke="#43b6ff" opacity=".54" stroke-width="1.5" fill="none">
+ <path d="M49 105H70L80 94H98M47 166H63L75 154H92M147 82H176L191 67M145 188H181L192 176"/>
+ <circle cx="49" cy="105" r="3" fill="#88dbff"/><circle cx="191" cy="67" r="3" fill="#88dbff"/><circle cx="192" cy="176" r="3" fill="#88dbff"/>
+ </g>
+ <text x="120" y="147" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-weight="900" font-style="italic" font-size="91" letter-spacing="-10" fill="#031632" stroke="#071530" stroke-width="8" paint-order="stroke">PS</text>
+ <text x="116" y="142" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-weight="900" font-style="italic" font-size="91" letter-spacing="-10" fill="url(#letters)" stroke="#81dbff" stroke-width="1.5" paint-order="stroke">PS</text>
+ <g transform="translate(120 190)" filter="url(#glow)"><rect x="-15" y="-2" width="30" height="23" rx="5" fill="#278efa" stroke="#b5efff" stroke-width="2"/><path d="M-9-2v-9a9 9 0 0 1 18 0v9" stroke="#9feaff" stroke-width="4" fill="none"/><circle cx="0" cy="8" r="3" fill="#d3faff"/></g>
+</g>
+</svg>

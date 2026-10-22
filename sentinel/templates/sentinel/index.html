@@ -1,0 +1,59 @@
+{% load static %}
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#050505">
+  <title>Python Sentinel | Cybersecurity Monitoring</title>
+  <link rel="icon" type="image/png" href="{% static 'sentinel/ps-logo.png' %}">
+  <link rel="stylesheet" href="{% static 'sentinel/style.css' %}">
+  <script>try{document.documentElement.dataset.theme=localStorage.getItem('ps-theme')||'dark';}catch(e){}</script>
+  <script src="{% static 'sentinel/app.js' %}" defer></script>
+</head>
+<body>
+<div class="splash" id="splash" role="status" aria-label="Python Sentinel initializing">
+ <div class="splash-grid"></div><div class="splash-content">
+   <div class="splash-shield"><img src="{% static 'sentinel/ps-logo.png' %}" alt="Python Sentinel PS cybersecurity logo"></div>
+   <p class="splash-kicker">SECURITY MONITORING PLATFORM</p>
+   <h1>PYTHON <span>SENTINEL</span></h1>
+   <p class="splash-caption">Automated Monitoring &amp; Alert Platform</p>
+   <div class="splash-progress"><span></span></div>
+   <div class="splash-status">Initializing security console<span class="dots">...</span></div>
+   <button type="button" id="skipSplash" class="splash-skip">Skip intro →</button>
+ </div>
+</div>
+<div class="app-shell">
+  <aside class="sidebar">
+    <a href="#/dashboard" class="brand">
+      <img class="brand-logo" src="{% static 'sentinel/ps-logo.png' %}" alt="PS logo">
+      <div><strong>PYTHON<br><span>SENTINEL</span></strong><small>CYBERSECURITY PLATFORM</small></div>
+    </a>
+    <div class="side-label">SECURITY WORKSPACE</div>
+    <nav class="navigation" aria-label="Main navigation">
+      <a href="#/dashboard" data-page="dashboard"><span>⌂</span> Dashboard</a>
+      <a href="#/events" data-page="events"><span>▤</span> Events</a>
+      <a href="#/alerts" data-page="alerts"><span>♧</span> Alerts</a>
+      <a href="#/rules" data-page="rules"><span>⬡</span> Detection Rules</a>
+      <a href="#/history" data-page="history"><span>◷</span> Detection History</a>
+      <a href="#/email" data-page="email"><span>✉</span> Email Analyzer</a>
+    </nav>
+    <div class="sidebar-card"><div class="pulse-icon">◈</div><p><b>Defense, made visible.</b></p><p>Every alert links back to its event and the rule that triggered it.</p><span>ITC-4940 · FALL 2026</span></div>
+    <div class="sidebar-bottom"><div class="shield">✓</div><div><b>Monitoring console</b><small>Powered by Django</small></div></div>
+  </aside>
+  <div class="workspace">
+    <header class="topbar">
+      <button class="mobile-menu" id="menuToggle" aria-label="Show navigation">☰</button>
+      <div class="breadcrumbs"><span>SECURITY CENTER</span><span class="slash">/</span><b id="breadcrumb">Dashboard</b></div>
+      <div class="top-right">
+       <button id="themeToggle" class="theme-toggle" type="button" aria-label="Switch between light and dark mode" aria-pressed="false"><span id="themeIcon">☀</span><span id="themeLabel">Light mode</span><span class="theme-knob"></span></button>
+       <span class="mode" id="modeBadge">DEMO MODE</span><span class="top-status" id="topStatus">● Monitoring stopped</span>
+      </div>
+    </header>
+    <main id="view" tabindex="-1"><div class="loading">Connecting to Django backend…</div></main>
+    <footer class="footer"><span>PYTHON SENTINEL · CAPSTONE ITC-4940 · UNC PEMBROKE · FALL 2026</span><span>DJANGO • MONITORING & ALERT PLATFORM</span></footer>
+  </div>
+</div>
+<div class="toast-area" id="toasts" aria-live="polite"></div>
+</body>
+</html>

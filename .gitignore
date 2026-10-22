@@ -1,0 +1,13 @@
+data/sentinel.db
+__pycache__/
+*.pyc
+.venv/
+
+.env
+.env.*
+!.env.example
+staticfiles/
+*.sqlite3
+db.sqlite3
+.DS_Store
+*.zip

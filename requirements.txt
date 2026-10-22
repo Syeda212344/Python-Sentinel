@@ -1,0 +1,6 @@
+Django>=5.2,<6.0
+gunicorn>=22,<24
+whitenoise>=6.8,<7
+dj-database-url>=2.3,<4
+psycopg2-binary>=2.9,<3
+pywin32>=306; platform_system == "Windows"

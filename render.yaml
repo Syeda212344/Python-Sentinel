@@ -1,0 +1,22 @@
+# Render Blueprint: connect to GitHub, then create a new Blueprint.
+# Set DATABASE_URL to an external persistent Postgres connection (e.g. Neon).
+# Do not put your connection string in GitHub.
+services:
+  - type: web
+    name: python-sentinel-lab
+    runtime: python
+    plan: free
+    buildCommand: bash build.sh
+    startCommand: bash start_render.sh
+    healthCheckPath: /healthz
+    envVars:
+      - key: SENTINEL_PUBLIC_DEMO
+        value: "1"
+      - key: SENTINEL_MODE
+        value: demo
+      - key: SENTINEL_SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: WEB_CONCURRENCY
+        value: "1"
