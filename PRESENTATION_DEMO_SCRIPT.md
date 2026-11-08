@@ -1,6 +1,6 @@
-# Python Sentinel — 6–8 minute classroom demo (Fall 2026)
+# Python Sentinel — 6–8 minute demo (Fall 2026)
 
-## Before the professor arrives
+
 
 1. Connect your Windows laptop to a power source. Open the project in VS Code.
 2. Start `START_DEMO.bat`, or run `py manage.py migrate`, `py manage.py seed_demo`, and `py manage.py runserver 127.0.0.1:8000 --noreload`.
