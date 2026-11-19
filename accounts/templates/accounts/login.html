@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Login | Python Sentinel</title>
+    <style>
+        body {
+            background: #101114;
+            color: #f4f4f5;
+            font-family: Arial, sans-serif;
+            display: grid;
+            place-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .card {
+            width: min(380px, 90%);
+            background: #202126;
+            padding: 32px;
+            border: 1px solid #444;
+            border-radius: 16px;
+        }
+        input {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 12px;
+            margin: 8px 0 16px;
+            border-radius: 8px;
+            border: 1px solid #555;
+            background: #141518;
+            color: white;
+        }
+        button {
+            width: 100%;
+            padding: 13px;
+            background: #e4e4e7;
+            color: #111;
+            border: 0;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        a { color: #d4d4d8; }
+        .errorlist { color: #ff9b9b; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Python Sentinel</h1>
+        <h2>Welcome Back</h2>
+
+        <form method="post">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button type="submit">Log In</button>
+        </form>
+
+        <p>New to Python Sentinel?
+            <a href="{% url 'signup' %}">Create Account</a>
+        </p>
+    </div>
+</body>
+</html>

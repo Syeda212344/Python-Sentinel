@@ -1,8 +1,10 @@
 """The three core entities match the Python Sentinel SRS 3.2–3.8."""
 from django.db import models
+from django.conf import settings
 
 class Event(models.Model):
     event_id = models.AutoField(primary_key=True)
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="sentinel_events", db_index=True)
     event_time = models.DateTimeField(db_index=True)
     source = models.CharField(max_length=100)
     event_type = models.CharField(max_length=100)

@@ -7,7 +7,7 @@ from .email_analysis import analyze_email
 from .services import ensure_rules, process_event
 
 
-def analyze_and_record(payload):
+def analyze_and_record(payload, *, owner=None):
     result = analyze_email(payload)  # All validation before any database insert
     ensure_rules()
     event_type = 'EMAIL_PHISHING_HIGH' if result['risk'] == 'High' else (
@@ -23,5 +23,5 @@ def analyze_and_record(payload):
         'username':None,
         'message':stored_message,
         'severity':result['risk'],
-    })
+    }, owner=owner)
     return {**result, **saved, 'event_type':event_type, 'saved':'Summary only; email content is not retained.'}

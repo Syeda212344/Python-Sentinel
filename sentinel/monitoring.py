@@ -50,9 +50,9 @@ class MonitoringService:
         return dict(active=self.active,mode=self.mode,warning=self.warning,error=self.error,
                     public_demo=(os.getenv('SENTINEL_PUBLIC_DEMO') == '1'))
 
-    def demo_event(self,kind):
+    def demo_event(self,kind, *, owner=None):
         if self.mode!='demo':raise ValueError('Test scenarios run only in DEMO mode.')
         if not self.active:raise ValueError('Start Monitoring before sending a test event.')
-        return generate_scenario(kind)
+        return generate_scenario(kind, owner=owner)
 
 monitor=MonitoringService()

@@ -22,12 +22,24 @@ additional_hosts = [h.strip() for h in os.getenv("SENTINEL_EXTRA_HOSTS", "").spl
 ALLOWED_HOSTS.extend(([render_host] if render_host else []) + additional_hosts)
 CSRF_TRUSTED_ORIGINS = ["https://" + h for h in ALLOWED_HOSTS if h not in ("localhost", "127.0.0.1", "testserver")]
 
-INSTALLED_APPS = ["django.contrib.staticfiles", "sentinel"]
+INSTALLED_APPS = [
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    "sentinel",
+    "accounts",
+]
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 if PUBLIC_DEMO:
@@ -35,7 +47,18 @@ if PUBLIC_DEMO:
 ROOT_URLCONF = "sentinel_site.urls"
 TEMPLATES = [{
     "BACKEND": "django.template.backends.django.DjangoTemplates",
-    "DIRS": [], "APP_DIRS": True, "OPTIONS": {"context_processors": []},
+    "DIRS": [],
+"APP_DIRS": True,
+
+"OPTIONS": {
+    "context_processors": [
+        "django.template.context_processors.debug",
+        "django.template.context_processors.request",
+        "django.contrib.auth.context_processors.auth",
+        "django.contrib.messages.context_processors.messages",
+    ],
+},
+
 }]
 database_url = os.getenv("DATABASE_URL", "").strip()
 if PUBLIC_DEMO and not database_url:
@@ -58,6 +81,9 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 STORAGES = {
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"}
 }
+LOGIN_URL = "/accounts/login/"
+LOGIN_REDIRECT_URL = "/"
+LOGOUT_REDIRECT_URL = "/accounts/login/"
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 
 if PUBLIC_DEMO:

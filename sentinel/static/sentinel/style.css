@@ -346,3 +346,92 @@ code{background:var(--surface-soft)!important;color:var(--accent)!important}
 .email-findings li p{color:var(--muted);font-size:12px;line-height:1.6;margin:4px 0 0}
 .email-disclaimer{font-size:12px;color:var(--muted);line-height:1.5;border-top:1px solid var(--line);padding-top:12px}
 @media(max-width:750px){.email-input-grid{grid-template-columns:1fr}}
+
+
+.logout-form {
+    margin: 0;
+    display: inline-flex;
+    align-items: center;
+}
+
+.logout-btn {
+    background: #242424;
+    color: #ffffff;
+    border: 1px solid #777777;
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.logout-btn:hover {
+    background: #555555;
+    border-color: #ffffff;
+}
+
+[data-theme="light"] .logout-btn {
+    background: #eeeeee;
+    color: #222222;
+    border-color: #bbbbbb;
+}
+
+/* Keep authentication controls visible in the topbar. */
+.top-right { flex-wrap: wrap; justify-content: flex-end; }
+.logout-form { margin: 0; display: inline-flex; align-items: center; flex-shrink: 0; }
+.logout-btn { background: #242424; color: #fff; border: 1px solid #777;
+  border-radius: 8px; padding: 10px 16px; font-size: 13px;
+  font-weight: 600; cursor: pointer; white-space: nowrap; }
+.logout-btn:hover { background: #555; border-color: #fff; }
+[data-theme="light"] .logout-btn { background: #eee; color: #222; border-color: #bbb; }
+@media (max-width: 750px) { .topbar { height: auto; min-height: 64px; padding-top: 8px; padding-bottom: 8px; } }
+
+/* Phase 2: authenticated account indicator */
+.account-status{color:#8bbd51;font-size:12px;font-weight:700;white-space:nowrap}
+[data-theme="light"] .account-status{color:#527b28}
+
+
+/* Python Sentinel: monitoring-aware vertical bars */
+
+/* Thin vertical bars */
+.activity-chart .event-bar,
+.activity-chart .alert-bar {
+    width: 5px !important;
+    min-width: 3px !important;
+    max-width: 5px !important;
+    border-radius: 2px 2px 0 0;
+}
+
+/* STARTED: green events, red alerts */
+.activity-chart.monitoring-on .event-bar {
+    background: #28a745 !important;
+}
+
+.activity-chart.monitoring-on .alert-bar {
+    background: #e63946 !important;
+}
+
+/* STOPPED: yellow and light-yellow */
+.activity-chart.monitoring-off .event-bar {
+    background: #ffbf00 !important;
+}
+
+.activity-chart.monitoring-off .alert-bar {
+    background: #ffe066 !important;
+}
+
+/* Legend dots follow monitoring status. The legend is outside .activity-chart. */
+body:has(.activity-chart.monitoring-on) .chart-legend .event-dot {
+    background: #28a745 !important;
+}
+body:has(.activity-chart.monitoring-on) .chart-legend .alert-dot {
+    background: #e63946 !important;
+}
+body:has(.activity-chart.monitoring-off) .chart-legend .event-dot {
+    background: #ffbf00 !important;
+}
+body:has(.activity-chart.monitoring-off) .chart-legend .alert-dot {
+    background: #ffe066 !important;
+}

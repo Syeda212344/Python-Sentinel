@@ -81,10 +81,10 @@ def rule_matches(event, rule):
 
 
 @transaction.atomic
-def process_event(payload, *, historical=False):
+def process_event(payload, *, historical=False, owner=None):
     """Keep event/alert foreign keys consistent in a single SQLite transaction."""
     clean = validate_event(payload)
-    event = Event.objects.create(**clean)
+    event = Event.objects.create(**clean, owner=owner)
     matches = [r for r in DetectionRule.objects.filter(enabled=True) if rule_matches(event, r)]
     ids = []
     for rule in matches:
@@ -99,7 +99,7 @@ def process_event(payload, *, historical=False):
     return {'event_id':event.event_id,'alert_ids':ids,'matched_rules':len(ids)}
 
 
-def generate_scenario(event_type, *, event_time=None, historical=False, batch=False):
+def generate_scenario(event_type, *, event_time=None, historical=False, batch=False, owner=None):
     if event_type not in SCENARIOS:
         raise ValueError('Unknown test scenario.')
     label, source, username, severity, message = SCENARIOS[event_type]
@@ -114,20 +114,20 @@ def generate_scenario(event_type, *, event_time=None, historical=False, batch=Fa
         'username':username,
         'severity':severity,
         'message':f"{'[BULK HISTORY DATA]' if batch else '[SIMULATED CLASSROOM EVENT]'} {message}"
-    },historical=historical)
+    },historical=historical,owner=owner)
 
 
-def seed_historical_data(*, reset=False):
+def seed_historical_data(*, reset=False, owner=None):
     """Idempotent history anchored to local date; no simulated records are real detections.
 
     Covers today, yesterday, last 2/30/60 days, and an older custom date range.
     """
     ensure_rules()
     if reset:
-        fake = Event.objects.filter(source__startswith=HISTORY_PREFIX, message__startswith='[BULK HISTORY DATA]')
+        fake = Event.objects.filter(owner=owner, source__startswith=HISTORY_PREFIX, message__startswith='[BULK HISTORY DATA]')
         Alert.objects.filter(event__in=fake).delete()
         fake.delete()
-    if Event.objects.filter(source__startswith=HISTORY_PREFIX, message__startswith='[BULK HISTORY DATA]').exists():
+    if Event.objects.filter(owner=owner, source__startswith=HISTORY_PREFIX, message__startswith='[BULK HISTORY DATA]').exists():
         return {'created':0, 'already_seeded':True}
     today = datetime.now().replace(hour=12,minute=0,second=0,microsecond=0)
     types=['FAILED_LOGIN','SUSPICIOUS_PROCESS','FILE_CHANGE','PRIVILEGE_CHANGE',
@@ -136,20 +136,20 @@ def seed_historical_data(*, reset=False):
     # Distribute records across 75 days, including today and yesterday.
     for days_ago in range(74,-1,-1):
         base = today-timedelta(days=days_ago)
-        generate_scenario('NORMAL_LOGIN', event_time=base.replace(hour=9,minute=10),historical=True,batch=True)
+        generate_scenario('NORMAL_LOGIN', event_time=base.replace(hour=9,minute=10),historical=True,batch=True,owner=owner)
         count+=1
         if days_ago % 2 == 0 or days_ago in (0,1,2,29,30,31,59,60):
             kind=types[days_ago%len(types)]
-            generate_scenario(kind,event_time=base.replace(hour=10,minute=15),historical=True,batch=True)
+            generate_scenario(kind,event_time=base.replace(hour=10,minute=15),historical=True,batch=True,owner=owner)
             count+=1
         if days_ago % 5 == 0:
             kind=types[(days_ago+3)%len(types)]
-            generate_scenario(kind,event_time=base.replace(hour=15,minute=25),historical=True,batch=True)
+            generate_scenario(kind,event_time=base.replace(hour=15,minute=25),historical=True,batch=True,owner=owner)
             count+=1
     return {'created':count,'already_seeded':False}
 
 
-def seed_custom_date(date_string):
+def seed_custom_date(date_string, *, owner=None):
     try:
         day=datetime.strptime(date_string,'%Y-%m-%d')
     except (ValueError,TypeError) as exc:
@@ -160,7 +160,7 @@ def seed_custom_date(date_string):
         raise ValueError('The public demo accepts historical dates from the past 365 days.')
     # Add a distinctive three-event sequence for that chosen calendar date.
     marker='[CUSTOM DATE SIMULATION]'
-    if Event.objects.filter(source__startswith=HISTORY_PREFIX,
+    if Event.objects.filter(owner=owner, source__startswith=HISTORY_PREFIX,
             event_time__date=day.date(),message__startswith=marker).exists():
         return {'created':0,'already_seeded':True,'date':date_string}
     ensure_rules()
@@ -169,7 +169,7 @@ def seed_custom_date(date_string):
         process_event({'event_time':day.replace(hour=clock[0],minute=clock[1]).strftime('%Y-%m-%d %H:%M:%S'),
             'source':HISTORY_PREFIX+source,'event_type':kind,
             'username':username,'severity':severity,
-            'message':f'{marker} {message}'},historical=True)
+            'message':f'{marker} {message}'},historical=True,owner=owner)
     return {'created':3,'already_seeded':False,'date':date_string}
 
 
@@ -198,17 +198,17 @@ def alert_dict(a, *, details=False):
     return result
 
 
-def summary():
-    return dict(events_processed=Event.objects.count(),
-                open_alerts=Alert.objects.filter(status='Open').count(),
-                alerts_total=Alert.objects.count(),
-                last_update=(Event.objects.order_by('-event_time').values_list('event_time',flat=True).first() or '').strftime('%Y-%m-%d %H:%M:%S') if Event.objects.exists() else None)
+def summary(owner=None):
+    return dict(events_processed=Event.objects.filter(owner=owner).count(),
+                open_alerts=Alert.objects.filter(event__owner=owner,status='Open').count(),
+                alerts_total=Alert.objects.filter(event__owner=owner).count(),
+                last_update=(Event.objects.filter(owner=owner).order_by('-event_time').values_list('event_time',flat=True).first() or '').strftime('%Y-%m-%d %H:%M:%S') if Event.objects.filter(owner=owner).exists() else None)
 
 
-def activity(days=30):
+def activity(days=30, *, owner=None):
     start=(datetime.now()-timedelta(days=days-1)).date()
-    events = Event.objects.filter(event_time__date__gte=start).values('event_time__date').annotate(total=Count('pk'))
-    alerts = Alert.objects.filter(alert_time__date__gte=start).values('alert_time__date').annotate(total=Count('pk'))
+    events = Event.objects.filter(owner=owner,event_time__date__gte=start).values('event_time__date').annotate(total=Count('pk'))
+    alerts = Alert.objects.filter(event__owner=owner,alert_time__date__gte=start).values('alert_time__date').annotate(total=Count('pk'))
     e_counts={str(x['event_time__date']):x['total'] for x in events}
     a_counts={str(x['alert_time__date']):x['total'] for x in alerts}
     result=[]

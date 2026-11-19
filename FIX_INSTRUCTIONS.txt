@@ -1,0 +1,29 @@
+PYTHON SENTINEL - LOGIN / LOGOUT FIX
+
+1. BACK UP your existing Python_Sentinel_Django/data/sentinel.db first.
+2. This ZIP intentionally does NOT contain a database, .env, or .git directory.
+3. Close the running Django server (Ctrl+C).
+4. Extract the ZIP. Copy its Python_Sentinel_Django project files into your
+   existing Python_Sentinel_Django folder, allowing file replacements.
+   DO NOT DELETE your existing data/sentinel.db.
+5. In VS Code terminal, change to your existing Python_Sentinel_Django folder.
+6. Run:
+       py manage.py check
+       py manage.py migrate
+       py manage.py runserver 127.0.0.1:8000 --noreload
+7. Open http://127.0.0.1:8000/accounts/login/ and sign in.
+8. Visit http://127.0.0.1:8000/ and use the Logout button at top right.
+
+FIXED:
+- Removed temporary TEST 123 and login debug text.
+- Kept logout POST form and its styles.
+- Added login requirement to homepage and JSON API endpoints.
+- Removed duplicate URL patterns.
+- Kept signup/login/logout routes and existing app features.
+
+IMPORTANT:
+- Existing events, alerts and detection rules are still SHARED data.
+  They are NOT private per-user records yet. Do not deploy this as a
+  multi-tenant security application until ownership isolation is implemented.
+- Existing SQLite database is not encrypted at rest by this change.
+- Public deployments need HTTPS, secure secrets, rate limiting and further review.

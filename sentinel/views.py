@@ -5,6 +5,8 @@ from datetime import datetime,timedelta
 from django.db import DatabaseError
 from django.http import JsonResponse
 from django.shortcuts import render
+from django.contrib.auth.decorators import login_required
+from functools import wraps
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET,require_POST
 from django.db.models import Prefetch
@@ -37,6 +39,7 @@ def _body(request):
     return data
 
 def guarded(handler):
+    @wraps(handler)
     def wrapper(*args,**kwargs):
         try:return handler(*args,**kwargs)
         except (ValueError,TypeError) as exc:return fail(exc)
@@ -47,35 +50,36 @@ def guarded(handler):
             return fail(str(exc),400)
     return wrapper
 
+@login_required
 @ensure_csrf_cookie
 @require_GET
 def home(request):return render(request,'sentinel/index.html')
 
 @require_GET
 @guarded
-def status(request):return JsonResponse({**monitor.status(),**services.summary()})
+def status(request):return JsonResponse({**monitor.status(),**services.summary(owner=request.user)})
 
 @require_GET
 @guarded
 def dashboard(request):
-    events=Event.objects.prefetch_related('alerts').order_by('-event_id')[:6]
-    alerts=Alert.objects.select_related('event','rule').order_by('-alert_id')[:5]
-    return JsonResponse({'monitor':monitor.status(),'summary':services.summary(),
+    events=Event.objects.filter(owner=request.user).prefetch_related('alerts').order_by('-event_id')[:6]
+    alerts=Alert.objects.filter(event__owner=request.user).select_related('event','rule').order_by('-alert_id')[:5]
+    return JsonResponse({'monitor':monitor.status(),'summary':services.summary(owner=request.user),
         'events':[services.event_dict(e) for e in events],
         'alerts':[services.alert_dict(a) for a in alerts],
-        'activity':services.activity(30)})
+        'activity':services.activity(30,owner=request.user)})
 
 @require_GET
 @guarded
 def events(request):
     take=_limit(request.GET.get('limit'))
-    records=Event.objects.prefetch_related('alerts').order_by('-event_id')[:take]
+    records=Event.objects.filter(owner=request.user).prefetch_related('alerts').order_by('-event_id')[:take]
     return JsonResponse({'events':[services.event_dict(e) for e in records]})
 
 @require_GET
 @guarded
 def event_detail(request,pk):
-    row=Event.objects.prefetch_related('alerts').filter(pk=pk).first()
+    row=Event.objects.filter(owner=request.user).prefetch_related('alerts').filter(pk=pk).first()
     return JsonResponse({'event':services.event_dict(row)}) if row else fail('Event not found.',404)
 
 @require_GET
@@ -87,7 +91,7 @@ def alerts(request):
     start=_date(request.GET.get('from'))
     end=_date(request.GET.get('to'))
     if start and end and start>end:raise ValueError('From date must not exceed To date.')
-    records=Alert.objects.select_related('event','rule')
+    records=Alert.objects.filter(event__owner=request.user).select_related('event','rule')
     if status:records=records.filter(status=status)
     if start:records=records.filter(alert_time__date__gte=start)
     if end:records=records.filter(alert_time__date__lte=end)
@@ -97,7 +101,7 @@ def alerts(request):
 @require_GET
 @guarded
 def alert_detail(request,pk):
-    a=Alert.objects.select_related('event','rule').filter(pk=pk).first()
+    a=Alert.objects.filter(event__owner=request.user).select_related('event','rule').filter(pk=pk).first()
     return JsonResponse({'alert':services.alert_dict(a,details=True)}) if a else fail('Alert not found.',404)
 
 @require_GET
@@ -110,12 +114,13 @@ def rules(request):
 @guarded
 def review_alert(request,pk):
     _body(request)
-    changed=Alert.objects.filter(pk=pk).update(status='Reviewed')
+    changed=Alert.objects.filter(pk=pk,event__owner=request.user).update(status='Reviewed')
     return JsonResponse({'updated':True}) if changed else fail('Alert not found.',404)
 
 @require_POST
 @guarded
 def toggle_rule(request,pk):
+    if not request.user.is_staff:return fail('Only staff may change shared detection rules.',403)
     body=_body(request)
     if type(body.get('enabled')) is not bool:raise ValueError('enabled must be true/false.')
     updated=DetectionRule.objects.filter(pk=pk).update(enabled=body['enabled'])
@@ -125,33 +130,35 @@ def toggle_rule(request,pk):
 @guarded
 def start_monitor(request):
     _body(request)
+    if monitor.mode=='windows' and not request.user.is_staff:return fail('Windows monitoring requires staff permissions.',403)
     return JsonResponse({'monitor':monitor.start()})
 
 @require_POST
 @guarded
 def stop_monitor(request):
     _body(request)
+    if monitor.mode=='windows' and not request.user.is_staff:return fail('Windows monitoring requires staff permissions.',403)
     return JsonResponse({'monitor':monitor.stop()})
 
 @require_POST
 @guarded
 def demo_event(request):
     payload=_body(request)
-    return JsonResponse({'result':monitor.demo_event(payload.get('event_type'))},status=201)
+    return JsonResponse({'result':monitor.demo_event(payload.get('event_type'),owner=request.user)},status=201)
 
 @require_POST
 @guarded
 def seed_demo(request):
     _body(request)
     if monitor.mode!='demo':return fail('Historical simulator is only available in demo mode.',403)
-    return JsonResponse({'result':services.seed_historical_data()})
+    return JsonResponse({'result':services.seed_historical_data(owner=request.user)})
 
 @require_POST
 @guarded
 def seed_date(request):
     if monitor.mode!='demo':return fail('Date simulator is only available in demo mode.',403)
     payload=_body(request)
-    return JsonResponse({'result':services.seed_custom_date(payload.get('date'))})
+    return JsonResponse({'result':services.seed_custom_date(payload.get('date'),owner=request.user)})
 
 @require_GET
 @guarded
@@ -170,5 +177,24 @@ def health(request):
 def analyze_email_sample(request):
     """CSRF-protected manual text analysis; never fetch links or accept attachments."""
     payload = _body(request)
-    result = analyze_and_record(payload)
+    result = analyze_and_record(payload,owner=request.user)
     return JsonResponse({'analysis': result}, status=201)
+
+# Require a signed-in session for the JSON API. Health checks remain public.
+# NOTE: Events, alerts, and rules still use shared legacy tables; user-level
+# isolation requires a separate ownership/data migration.
+def _api_auth_required(view):
+    @wraps(view)
+    def secured(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return JsonResponse({"error": "Authentication required."}, status=401)
+        return view(request, *args, **kwargs)
+    return secured
+
+for _name in (
+    "status", "dashboard", "events", "event_detail", "alerts",
+    "alert_detail", "rules", "review_alert", "toggle_rule",
+    "start_monitor", "stop_monitor", "demo_event", "seed_demo",
+    "seed_date", "scenarios", "analyze_email_sample",
+):
+    globals()[_name] = _api_auth_required(globals()[_name])

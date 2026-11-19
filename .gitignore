@@ -11,3 +11,16 @@ staticfiles/
 db.sqlite3
 .DS_Store
 *.zip
+
+*.db
+*.db-*
+*.sqlite3
+*.sqlite3-*
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
+venv/
+.venv/
+*.log

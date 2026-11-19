@@ -11,6 +11,31 @@ let historyPreset = 'all';
 let alertsStatus = '';
 let lastEmailAnalysis = null;
 let busy = false;
+let lastScenarioResult = null;
+
+function scenarioResultPanel() {
+  if (!lastScenarioResult) return '';
+
+  const r = lastScenarioResult;
+
+  return card(
+    'Security Test Results',
+    'Latest simulated security scenario',
+    `<div class="panel-body">
+      <dl class="detail-rows">
+        <dt>Date</dt><dd>${h(r.date)}</dd>
+        <dt>Time</dt><dd>${h(r.time)}</dd>
+        <dt>Event ID</dt><dd>${h(r.eventId)}</dd>
+        <dt>Recorded Events</dt><dd>${h(r.events)}</dd>
+        <dt>Recorded Alerts</dt><dd>${h(r.alerts)}</dd>
+        <dt>Monitoring Status</dt><dd>${badge(r.monitoring)}</dd>
+        <dt>Detection</dt><dd>${h(r.detection)}</dd>
+        <dt>Severity</dt><dd>${badge(r.severity)}</dd>
+        <dt>Result</dt><dd>${h(r.result)}</dd>
+      </dl>
+    </div>`
+  );
+}
 
 function h(value) { // Escape every backend value before inserting into HTML.
   return String(value ?? '—').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -74,7 +99,7 @@ function alertRows(alerts) {
   return alerts.map(a=>`<tr><td class="td-strong">#${a.alert_id}</td><td>${time(a.alert_time)}</td><td>${badge(a.severity)}</td><td class="td-strong">${h(a.rule_name)}${a.source?.startsWith("SIMULATED")?'<span class="demo-tag">SIMULATED</span>':''}</td><td>${h(a.description)}</td><td>${badge(a.status)}</td><td><a href="#/alerts/${a.alert_id}" class="link">View details →</a></td></tr>`);
 }
 function fmtCount(n) {return Number(n || 0).toLocaleString();}
-function activityChart(days=[]) {
+function activityChart(days=[], monitoringActive=false) {
   if (!days.length) return '';
   const maximum=Math.max(1,...days.map(d=>Number(d.events)||0));
   const bars=days.map((d,i)=>{
@@ -82,13 +107,131 @@ function activityChart(days=[]) {
     const eh=Math.max(e?7:0,(e/maximum)*100), ah=Math.max(a?7:0,(a/maximum)*100);
     return `<div class="chart-column" title="${h(d.date)}: ${e} events, ${a} alerts"><div class="chart-bars"><div class="event-bar" style="height:${eh}%"></div><div class="alert-bar" style="height:${ah}%"></div></div><span>${i%6===0?h(d.date.slice(5)):''}</span></div>`;
   }).join('');
+  // The counters match the same 30-day dataset displayed in the graph.
+  const totalEvents = days.reduce((sum, day) => sum + (Number(day.events) || 0), 0);
+  const totalAlerts = days.reduce((sum, day) => sum + (Number(day.alerts) || 0), 0);
   return card('Security Activity · Last 30 Days','Real stored record counts, including clearly labeled simulated examples',
-    `<div class="chart-legend"><span><i class="event-dot"></i>Events</span><span><i class="alert-dot"></i>Alerts</span></div><div class="activity-chart" role="img" aria-label="Event and alert totals over the last 30 days">${bars}</div>`);
+    `<div class="chart-count-summary" style="display:flex;flex-wrap:wrap;gap:12px;margin:12px 0 18px" aria-label="Recorded activity totals for the last 30 days">
+      <div style="flex:1;min-width:145px;border:1px solid #777;border-radius:10px;padding:12px 16px;background:transparent"><div style="font-size:12px;font-weight:700;letter-spacing:.04em">RECORDED EVENTS · 30 DAYS</div><div style="font-size:28px;font-weight:800;margin-top:5px">${fmtCount(totalEvents)}</div></div>
+      <div style="flex:1;min-width:145px;border:1px solid #777;border-radius:10px;padding:12px 16px;background:transparent"><div style="font-size:12px;font-weight:700;letter-spacing:.04em">RECORDED ALERTS · 30 DAYS</div><div style="font-size:28px;font-weight:800;margin-top:5px">${fmtCount(totalAlerts)}</div></div>
+    </div><div class="chart-legend"><span><i class="event-dot"></i>Events</span><span><i class="alert-dot"></i>Alerts</span></div><div class="activity-chart ${monitoringActive ? 'monitoring-on' : 'monitoring-off'}" role="img" aria-label="Event and alert totals over the last 30 days">${bars}</div>`);
 }
 function scenarioButtons(){
  const list=[['Normal Login','NORMAL_LOGIN','demo-normal'],['Failed Login','FAILED_LOGIN','demo-failed'],['File Change','FILE_CHANGE','demo-file'],['Suspicious Process','SUSPICIOUS_PROCESS','demo-process'],['Privilege Change','PRIVILEGE_CHANGE','demo-privilege'],['Account Lockout','ACCOUNT_LOCKOUT','demo-lockout'],['Service Stopped','SERVICE_STOPPED','demo-service'],['Audit Log Cleared','SECURITY_LOG_CLEARED','demo-audit'],['Unusual Network','SUSPICIOUS_NETWORK','demo-network']];
  return list.map(([label,type,actionName])=>`<button type="button" class="btn scenario ${type==='NORMAL_LOGIN'?'normal':type==='FAILED_LOGIN'?'primary':''}" data-action="${actionName}" title="Generate SIMULATED ${h(type)} event">${h(label)} <span>↗</span></button>`).join('');
 }
+
+let validationResult = null;
+let validationHistory = [];
+let validationScenario = 'FAILED_LOGIN';
+
+const validationCases = [
+  ['NORMAL_LOGIN', 'Normal Login'],
+  ['FAILED_LOGIN', 'Failed Login'],
+  ['FILE_CHANGE', 'File Change'],
+  ['SUSPICIOUS_PROCESS', 'Suspicious Process'],
+  ['PRIVILEGE_CHANGE', 'Privilege Change'],
+  ['ACCOUNT_LOCKOUT', 'Account Lockout'],
+  ['SERVICE_STOPPED', 'Service Stopped'],
+  ['SECURITY_LOG_CLEARED', 'Audit Log Cleared'],
+  ['SUSPICIOUS_NETWORK', 'Unusual Network']
+];
+
+function validationPage(data) {
+  const selectedRule = data.rules.find(
+    r => r.pattern === validationScenario
+  );
+
+  const enabled = Boolean(selectedRule?.enabled);
+
+  const options = validationCases.map(([value, label]) =>
+    `<option value="${h(value)}"
+      ${validationScenario === value ? 'selected' : ''}>
+      ${h(label)}
+    </option>`
+  ).join('');
+
+  let resultHtml = '<div class="empty">Run a test to view its results.</div>';
+
+  if (validationResult) {
+    const r = validationResult;
+
+    resultHtml = detailRows([
+      ['Test ID', h(r.id)],
+      ['Executed At', h(r.time)],
+      ['Input / Scenario', h(r.scenario)],
+      ['Rule Enabled', h(r.enabled ? 'True' : 'False')],
+      ['Expected Result', h(r.expected)],
+      ['Actual Result', h(r.actual)],
+      ['Event ID', h(r.eventId)],
+      ['Severity', badge(r.severity)],
+      ['Status', badge(r.status)]
+    ]);
+  }
+
+  const rows = validationHistory.map(r => `
+    <tr>
+      <td>${h(r.id)}</td>
+      <td>${h(r.scenario)}</td>
+      <td>${h(r.enabled ? 'Enabled' : 'Disabled')}</td>
+      <td>${h(r.expected)}</td>
+      <td>${h(r.actual)}</td>
+      <td>${badge(r.severity)}</td>
+      <td>${badge(r.status)}</td>
+    </tr>
+  `);
+
+  const configuration = `
+    <div class="panel-body">
+      <div class="field">
+        <label for="validationScenario">SECURITY SCENARIO</label>
+        <select id="validationScenario">${options}</select>
+      </div>
+      <p class="intro">
+        Matching rule:
+        <strong>${h(selectedRule?.rule_name || 'None')}</strong>
+      </p>
+      <p class="intro">
+        Rule status:
+        ${badge(enabled ? 'Enabled' : 'Disabled')}
+      </p>
+      <p class="intro">
+        Rule settings can be changed on the Detection Rules page
+        by an authorized staff account.
+      </p>
+      ${action('▶ Run Test', 'run-validation', '', 'primary')}
+    </div>
+  `;
+
+  const logic = `
+    <div class="panel-body">
+      <p><strong>1.</strong> Receive simulated event</p>
+      <p><strong>2.</strong> Store event in database</p>
+      <p><strong>3.</strong> Evaluate matching detection rule</p>
+      <p><strong>4.</strong> Generate alert when enabled rule matches</p>
+      <p><strong>5.</strong> Compare observed and expected results</p>
+    </div>
+  `;
+
+  return header(
+    'Test and Validation',
+    'Verify security detection logic using recorded test results.'
+  ) +
+  card('Test Configuration', 'Select a security scenario', configuration) +
+  card('Execution Result', 'Latest test outcome', resultHtml) +
+  card('Code Path (Logic)', 'Simplified detection workflow', logic) +
+  card(
+    'Test Cases and Results',
+    'Tests executed during this browser session',
+    makeTable(
+      ['Test ID', 'Scenario', 'Rule', 'Expected',
+       'Actual', 'Severity', 'Status'],
+      rows,
+      'No tests executed yet.'
+    )
+  );
+}
+
 function dashboard(data) {
   const m = data.monitor, s = data.summary;
   const actions = action(m.active?'■ Stop Monitoring':'▶ Start Monitoring', m.active?'stop':'start', '', m.active?'danger':'primary');
@@ -108,9 +251,10 @@ function dashboard(data) {
        <input type="date" id="customSeedDate" max="${offsetDate(0)}" value="${offsetDate(10)}" aria-label="Date to generate historical example events">
        ${action('Generate 3 Events on This Date','seed-date','','primary')}</div></div>`);
   }
+  html += scenarioResultPanel();
   html += card('Email Threat Analysis','Additional sample-based detection module',
     `<div class="panel-body"><p class="intro">Paste a sample email to review phishing indicators. The app records only a redacted event summary.</p><a href="#/email" class="btn primary">Open Email Analyzer →</a></div>`);
-  html += activityChart(data.activity || []);
+  html += activityChart(data.activity || [], m.active)
   html += card('Recent Alerts','Suspicious events matched to enabled detection rules',
     makeTable(['ID','Alert Time','Severity','Rule','Description','Status','Action'],alertRows(data.alerts),'No alerts yet. Try a failed-login test event.'),
     `<a href="#/alerts">View all alerts →</a>`);
@@ -228,7 +372,15 @@ async function render(quiet=false) {
   const name=parts[0] || 'dashboard';
   document.querySelectorAll('[data-page]').forEach(a=>a.classList.toggle('active',a.dataset.page===name));
   document.querySelector('.sidebar').classList.remove('show');
-  const names={dashboard:'Dashboard',events:'Events',alerts:'Alerts',rules:'Detection Rules',history:'Detection History',email:'Email Analyzer'};
+  const names={
+  dashboard:'Dashboard',
+  events:'Events',
+  alerts:'Alerts',
+  rules:'Detection Rules',
+  history:'Detection History',
+  validation:'Test and Validation',
+  email:'Email Analyzer'
+};
   document.getElementById('breadcrumb').textContent=names[name] || 'Dashboard';
   if (!quiet) view.innerHTML='<div class="loading">Loading Python Sentinel…</div>';
   try {
@@ -248,9 +400,15 @@ async function render(quiet=false) {
       else {const data=await api(`/api/alerts?limit=200&status=${encodeURIComponent(alertsStatus)}`);html=alertsPage(data);}
     } else if(name==='rules') {
       html=rulesPage(await api('/api/rules'));
-    } else if(name==='email') {
-      html=emailAnalyzerPage();
-    } else if(name==='history') {
+   
+} else if(name==='validation') {
+  const data = await api('/api/rules');
+  html = validationPage(data);
+
+} else if(name==='email') {
+  html = emailAnalyzerPage();
+
+} else if(name==='history') {
       const params=new URLSearchParams({limit:'500'});
       if(historyFrom)params.set('from',historyFrom);
       if(historyTo)params.set('to',historyTo);
@@ -267,17 +425,126 @@ async function sendAction(actionName,id) {
   busy=true;
   try {
     switch(actionName) {
+      
+case 'run-validation': {
+  const type = validationScenario;
+  const ruleData = await api('/api/rules');
+  const rule = ruleData.rules.find(r => r.pattern === type);
+
+  const enabled = Boolean(rule?.enabled);
+  const expectedAlert = type !== 'NORMAL_LOGIN' && enabled;
+
+  const beforeEvents = await api('/api/events?limit=200');
+  const previousIds = new Set(
+    beforeEvents.events.map(e => Number(e.event_id))
+  );
+
+  const outcome = await post('/api/demo/event', {
+    event_type: type
+  });
+
+  const afterEvents = await api('/api/events?limit=200');
+
+  const createdEvent = afterEvents.events.find(
+    e => !previousIds.has(Number(e.event_id)) &&
+         e.event_type === type
+  );
+
+  if (!createdEvent) {
+    throw new Error(
+      'Test submitted, but the new event could not be verified.'
+    );
+  }
+
+  const alertData = await api('/api/alerts?limit=500');
+  const relatedAlerts = alertData.alerts.filter(
+    a => Number(a.event_id) === Number(createdEvent.event_id)
+  );
+
+  const actualAlert = relatedAlerts.length > 0;
+  const passed = actualAlert === expectedAlert;
+
+  const record = {
+    id: 'TC-' + String(validationHistory.length + 1).padStart(3, '0'),
+    time: new Date().toLocaleString(),
+    scenario: type,
+    enabled,
+    expected: expectedAlert ? 'Event + alert' : 'Event only',
+    actual: actualAlert ? 'Event + alert' : 'Event only',
+    eventId: '#' + createdEvent.event_id,
+    severity: createdEvent.severity,
+    status: passed ? 'PASS' : 'FAIL'
+  };
+
+  validationResult = record;
+  validationHistory.unshift(record);
+
+  toast(
+    passed ? 'Test passed.' : 'Test failed. Review detection results.',
+    !passed
+  );
+  break;
+}
+
       case 'start': await post('/api/monitor/start');toast('Monitoring started.');break;
       case 'stop':await post('/api/monitor/stop');toast('Monitoring stopped.');break;
-      case 'demo-normal':await post('/api/demo/event',{event_type:'NORMAL_LOGIN'});toast('Normal event stored — no alert should be generated.');break;
-      case 'demo-failed':await post('/api/demo/event',{event_type:'FAILED_LOGIN'});toast('Failed-login test event sent. Check the alert.');break;
-      case 'demo-file':await post('/api/demo/event',{event_type:'FILE_CHANGE'});toast('File-change test event sent.');break;
-      case 'demo-process':await post('/api/demo/event',{event_type:'SUSPICIOUS_PROCESS'});toast('Suspicious-process simulation created.');break;
-      case 'demo-privilege':await post('/api/demo/event',{event_type:'PRIVILEGE_CHANGE'});toast('Privilege-change simulation created.');break;
-      case 'demo-lockout':await post('/api/demo/event',{event_type:'ACCOUNT_LOCKOUT'});toast('Account lockout simulation created.');break;
-      case 'demo-service':await post('/api/demo/event',{event_type:'SERVICE_STOPPED'});toast('Service-stop simulation created.');break;
-      case 'demo-audit':await post('/api/demo/event',{event_type:'SECURITY_LOG_CLEARED'});toast('Audit-log simulation created.');break;
-      case 'demo-network':await post('/api/demo/event',{event_type:'SUSPICIOUS_NETWORK'});toast('Unusual-network simulation created.');break;
+case 'demo-normal':
+case 'demo-failed':
+case 'demo-file':
+case 'demo-process':
+case 'demo-privilege':
+case 'demo-lockout':
+case 'demo-service':
+case 'demo-audit':
+case 'demo-network': {
+  const types = {
+    'demo-normal': 'NORMAL_LOGIN',
+    'demo-failed': 'FAILED_LOGIN',
+    'demo-file': 'FILE_CHANGE',
+    'demo-process': 'SUSPICIOUS_PROCESS',
+    'demo-privilege': 'PRIVILEGE_CHANGE',
+    'demo-lockout': 'ACCOUNT_LOCKOUT',
+    'demo-service': 'SERVICE_STOPPED',
+    'demo-audit': 'SECURITY_LOG_CLEARED',
+    'demo-network': 'SUSPICIOUS_NETWORK'
+  };
+
+  const eventType = types[actionName];
+
+  await post('/api/demo/event', {event_type: eventType});
+
+  const data = await api('/api/dashboard');
+
+  const matchingEvent = data.events.find(
+    e => e.event_type === eventType &&
+         String(e.source || '').startsWith('SIMULATED')
+  );
+
+  const matchingAlerts = matchingEvent
+    ? data.alerts.filter(
+        a => Number(a.event_id) === Number(matchingEvent.event_id)
+      )
+    : [];
+
+  const now = new Date();
+
+  lastScenarioResult = {
+    date: now.toLocaleDateString(),
+    time: now.toLocaleTimeString(),
+    eventId: matchingEvent ? `#${matchingEvent.event_id}` : 'Not available',
+    events: data.summary.events_processed,
+    alerts: data.summary.open_alerts,
+    monitoring: data.monitor.active ? 'ACTIVE' : 'STOPPED',
+    detection: eventType,
+    severity: matchingEvent?.severity || 'Info',
+    result: matchingAlerts.length
+      ? `${matchingAlerts.length} matching alert(s) generated or recorded`
+      : 'No matching alert found in recent results'
+  };
+
+  toast(`${eventType} test completed.`);
+  break;
+}
       case 'seed-demo':{const out=await post('/api/demo/seed');toast(out.result.already_seeded?'Historical demo data is already loaded.':`Generated ${out.result.created} simulated events across 75 days.`);break;}
       case 'seed-date':{const date=document.getElementById('customSeedDate').value;
         if (!date)throw new Error('Choose a date to simulate.');
@@ -335,6 +602,12 @@ async function sendAction(actionName,id) {
     await render();
   } catch(err){toast(err.message,true);} finally{busy=false;}
 }
+document.body.addEventListener('change', ev => {
+  if (ev.target.id === 'validationScenario') {
+    validationScenario = ev.target.value;
+    render();
+  }
+});
 document.body.addEventListener('click',ev=>{
   const target=ev.target.closest('[data-action]');
   if(target){ev.preventDefault();sendAction(target.dataset.action,target.dataset.id||'');}
