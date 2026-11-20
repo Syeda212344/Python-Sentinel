@@ -1,5 +1,6 @@
 """Email-analysis functional tests (run with python manage.py test sentinel.tests)."""
 import json
+from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from sentinel.email_analysis import analyze_email
 from sentinel.models import Alert, DetectionRule, Event
@@ -53,6 +54,10 @@ class EmailAPIIntegrationTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         ensure_rules()
+        cls.user = get_user_model().objects.create_user(username="email_tester")
+
+    def setUp(self):
+        self.client.force_login(self.user)
 
     def post_email(self, data):
         return self.client.post('/api/email/analyze',json.dumps(data),content_type='application/json')
@@ -110,6 +115,7 @@ class EmailAPIIntegrationTests(TestCase):
 
     def test_csrf_required_for_mutation(self):
         strict=Client(enforce_csrf_checks=True)
+        strict.force_login(self.user)
         response=strict.post('/api/email/analyze',json.dumps(SUSPICIOUS),content_type='application/json')
         self.assertEqual(response.status_code,403)
 

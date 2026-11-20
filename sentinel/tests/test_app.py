@@ -1,5 +1,6 @@
 """White-box / API tests. Run: py manage.py test sentinel.tests -v 2"""
 import json
+from django.contrib.auth import get_user_model
 from datetime import datetime,timedelta
 from django.test import TestCase,Client
 from sentinel.models import Event,Alert,DetectionRule
@@ -11,11 +12,13 @@ class PythonSentinelTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         ensure_rules()
+        cls.user = get_user_model().objects.create_user(username="testuser", is_staff=True)
 
     def setUp(self):
         monitor.stop()
         monitor.mode='demo'
         self.client=Client(enforce_csrf_checks=False)
+        self.client.force_login(self.user)
 
     def event(self,kind='NORMAL_LOGIN',day=None):
         return dict(event_time=(day or datetime.now()).strftime('%Y-%m-%d %H:%M:%S'),
@@ -103,20 +106,20 @@ class PythonSentinelTests(TestCase):
         self.assertIn('events',response.json())
 
     def test_status_and_events_endpoints(self):
-        process_event(self.event())
+        process_event(self.event(), owner=self.user)
         self.assertEqual(self.client.get('/api/status').json()['events_processed'],1)
         self.assertEqual(len(self.client.get('/api/events').json()['events']),1)
         e=Event.objects.first()
         self.assertEqual(self.client.get(f'/api/events/{e.pk}').json()['event']['event_id'],e.pk)
 
     def test_alert_detail_has_event_and_rule(self):
-        out=process_event(self.event('FILE_CHANGE'))
+        out=process_event(self.event('FILE_CHANGE'), owner=self.user)
         body=self.client.get(f"/api/alerts/{out['alert_ids'][0]}").json()['alert']
         self.assertEqual(body['event_type'],'FILE_CHANGE')
         self.assertEqual(body['pattern'],'FILE_CHANGE')
 
     def test_mark_reviewed_via_api(self):
-        out=process_event(self.event('FAILED_LOGIN'))
+        out=process_event(self.event('FAILED_LOGIN'), owner=self.user)
         response=self.client.post(f"/api/alerts/{out['alert_ids'][0]}/review",'{}',content_type='application/json')
         self.assertEqual(response.status_code,200)
         self.assertEqual(Alert.objects.first().status,'Reviewed')
@@ -135,8 +138,8 @@ class PythonSentinelTests(TestCase):
     def test_date_filter_exact_inclusive(self):
         today=datetime.now()
         old=today-timedelta(days=16)
-        process_event(self.event('FAILED_LOGIN',old),historical=True)
-        process_event(self.event('FILE_CHANGE',today),historical=True)
+        process_event(self.event('FAILED_LOGIN',old),historical=True, owner=self.user)
+        process_event(self.event('FILE_CHANGE',today),historical=True, owner=self.user)
         day=old.date().isoformat()
         rows=self.client.get(f'/api/alerts?from={day}&to={day}').json()['alerts']
         self.assertEqual(len(rows),1)
@@ -167,6 +170,7 @@ class PythonSentinelTests(TestCase):
 
     def test_csrf_protects_mutating_endpoints(self):
         strict=Client(enforce_csrf_checks=True)
+        strict.force_login(self.user)
         response=strict.post('/api/monitor/start','{}',content_type='application/json')
         self.assertEqual(response.status_code,403)
         page=strict.get('/')
@@ -196,6 +200,8 @@ class PythonSentinelTests(TestCase):
 
 class PublicSiteSmokeTests(TestCase):
     def test_homepage_does_not_render_classroom_checklist(self):
+        user = get_user_model().objects.create_user(username="homepage_tester")
+        self.client.force_login(user)
         response = self.client.get('/')
         self.assertEqual(response.status_code, 200)
         self.assertNotIn(b'Presentation Checklist', response.content)
